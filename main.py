@@ -37,7 +37,7 @@ def load_test_data(test_file_path):
     return data
 
 
-# convert reviews to bag-of-words representation
+# convert dataset reviews to bag-of-words representation
 def create_sparse_bow_vector(review, _word_to_index):
     bow_vector = lil_matrix((1, len(_word_to_index)), dtype=np.float32)
     _words = review.split()
