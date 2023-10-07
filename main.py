@@ -108,7 +108,7 @@ class KNNClassifierSparse:
 
 
 if __name__ == "__main__":
-    train_data = load_train_data("train1.txt")
+    train_data = load_train_data("train.txt")
     labels, reviews = zip(*train_data)
 
     preprocessed_reviews = [preprocess_data(review) for review in reviews]
