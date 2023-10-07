@@ -20,7 +20,6 @@ In this project, we create the KNN algorithm based on scikit-learn k-nearest nei
 - `train.txt`: Training data containing sentiment labels and movie reviews.
 - `test.txt`: Test data containing movie reviews (without sentiment labels).
 - `main.py`: Main Python script for preprocessing, training, and evaluating the KNN classifier.
-- `utils.py`: Utility functions for data loading, preprocessing, and visualization.
 - `README.md`: Project overview, instructions, and usage details.
 
 ## Installation
