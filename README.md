@@ -7,8 +7,6 @@ This project implements a sentiment analysis model using the K-Nearest Neighbors
 - [Project Structure](#project-structure)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Results](#results)
-- [License](#license)
 
 ## Introduction
 
@@ -26,5 +24,10 @@ In this project, we create the KNN algorithm based on scikit-learn k-nearest nei
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/sentiment-analysis-knn.git
-   cd sentiment-analysis-knn
+   git clone https://github.com/Livingstone-Billy/knn-classifier-python.git
+   cd knn-classifier-python
+   ```
+## Usage
+```bash
+python main.py
+```
