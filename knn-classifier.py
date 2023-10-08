@@ -44,11 +44,11 @@ class KNNClassifier:
                 predictions.append(predicted_label)
         return predictions
 
-    # Inside the KNNClassifier class
     def k_fold_cross_validation(self, X_train_sparse, y_train, k_values, n_splits=5):
         accuracies = {}
 
-        # Convert sparse matrix to dense numpy array for easier slicing
+        # Convert sparse matrix to dense numpy
+        # array for easier slicing and improved runtime
         X_train = X_train_sparse.toarray()
         fold_size = len(X_train) // n_splits
 
