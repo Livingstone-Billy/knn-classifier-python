@@ -1,11 +1,9 @@
 import re
-import numpy as np
 from collections import Counter
-from scipy.sparse import lil_matrix
-from sklearn.model_selection import KFold
+
 import matplotlib.pyplot as plt
-from sklearn.metrics import precision_score, recall_score, f1_score
-from sklearn.decomposition import PCA
+import numpy as np
+from scipy.sparse import lil_matrix
 
 
 # load training data from file
@@ -24,6 +22,7 @@ def load_train_data(train_path):
 def preprocess_data(text):
     # Remove HTML tags
     text = re.sub(r'<.*?>', '', text)
+    text = text.replace('#EOF', '')
     # Remove unwanted characters and convert to lowercase
     text = re.sub(r'[^a-zA-Z\s]', '', text).lower()
     return text
@@ -47,9 +46,54 @@ def create_sparse_bow_vector(review, _word_to_index):
     return bow_vector
 
 
+def calculate_precision(y_true, y_pred, positive_label=1):
+    true_positives = np.sum((y_true == positive_label) & (y_pred == positive_label))
+    predicted_positives = np.sum(y_pred == positive_label)
+
+    precision = true_positives / (predicted_positives + 1e-15)
+    return precision
+
+
+def calculate_recall(y_true, y_pred, positive_label=1):
+    true_positives = np.sum((y_true == positive_label) & (y_pred == positive_label))
+    actual_positives = np.sum(y_true == positive_label)
+
+    recall = true_positives / (actual_positives + 1e-15)
+    return recall
+
+
+def f1_score(y_true, y_pred):
+    precision = calculate_precision(y_true, y_pred)
+    recall = calculate_recall(y_true, y_pred)
+
+    f1 = 2 * (precision * recall) / (precision + recall)
+    return f1
+
+
+def principal_component_analysis(X, num_components):
+    # Center the data
+    mean = np.mean(X, axis=0)
+    centered_data = X - mean
+
+    # calculate the covariance matrix
+    covariance_matrix = np.cov(centered_data, rowvar=False)
+
+    # calculate eigenvectors & eigen values
+    eigen_values, eigen_vectors = np.linalg.eig(covariance_matrix)
+
+    # Sort eigen vectors by eigen values
+    indices = np.argsort(-eigen_values)
+    sorted_eigenvectors = eigen_vectors[:, indices]
+
+    # project the data to a new feature space
+    projected_data = centered_data @ sorted_eigenvectors[:, num_components]
+
+    return projected_data, sorted_eigenvectors, mean
+
+
 # calculates the Euclidean distance between two vectors.
 def euclidean_distance(x1, x2):
-    return np.sqrt(np.sum(x1 - x2) ** 2)
+    return np.sqrt(np.sum((x1 - x2) ** 2))
 
 
 class KNNClassifierSparse:
@@ -79,30 +123,38 @@ class KNNClassifierSparse:
                 predictions.append(min_distance_label)
         return predictions
 
-    def cross_validation(self, X_train_sparse, y_train, k_values, n_splits=10, metric='accuracy'):
+    def cross_validation(self, X_train_sparse, y_train, k_values, n_splits=5):
         accuracies = {}
-        # Initialize KFold for data splitting
-        kf = KFold(n_splits=n_splits)
+
+        """
+        Convert sparse matrix to dense numpy array
+        for easier slicing &
+        runtime improvement
+        """
+
+        X_train = X_train_sparse.toarray()
+        fold_size = len(X_train) // n_splits
 
         for k in k_values:
-            fold_metrics = []
+            fold_accuracies = []
 
-            for train_idx, val_idx in kf.split(X_train_sparse):
-                X_train_fold, X_val = X_train_sparse[train_idx], X_train_sparse[val_idx]
-                y_train_fold, y_val = y_train[train_idx], y_train[val_idx]
+            for i in range(n_splits):
+                # Split the data into training and validation sets
+                val_start = i * fold_size
+                val_end = (i + 1) * fold_size
+
+                X_val = X_train[val_start:val_end]
+                y_val = y_train[val_start:val_end]
+
+                X_train_fold = np.concatenate((X_train[:val_start], X_train[val_end:]), axis=0)
+                y_train_fold = np.concatenate((y_train[:val_start], y_train[val_end:]), axis=0)
 
                 y_pred = self.predict(X_train_fold, y_train_fold, X_val)
 
-                if metric == 'precision':
-                    fold_metrics.append(precision_score(y_val, y_pred, average='weighted'))
-                elif metric == 'recall':
-                    fold_metrics.append(recall_score(y_val, y_pred, average='weighted'))
-                elif metric == 'f1':
-                    fold_metrics.append(f1_score(y_val, y_pred, average='weighted'))
-                # Add more metrics if needed
+                accuracy = np.mean(y_pred == y_val)
+                fold_accuracies.append(accuracy)
 
-            if fold_metrics:
-                accuracies[k] = np.mean(fold_metrics)
+            accuracies[k] = np.mean(fold_accuracies)
 
         return accuracies
 
@@ -122,7 +174,7 @@ if __name__ == "__main__":
     word_to_index = {word: idx for idx, (word, _) in enumerate(vocab.items())}
 
     # Convert training reviews to bag of words representation using scipy.sparse
-    X_train_sparse = lil_matrix((len(preprocessed_reviews), len(word_to_index)), dtype=np.float32)
+    X_train_sparse = lil_matrix((len(preprocessed_reviews), len(word_to_index)), dtype=np.uint8)
     for i, review in enumerate(preprocessed_reviews):
         X_train_sparse[i] = create_sparse_bow_vector(review, word_to_index)
 
@@ -137,11 +189,10 @@ if __name__ == "__main__":
     for i, review in enumerate(preprocess_test_data):
         X_test_sparse[i] = create_sparse_bow_vector(review, word_to_index)
 
-    k_val = [1, 3, 4, 5, 6, 9, 10]
+    k_val = [3, 9, 20, 30, 50]
     knn_classifier = KNNClassifierSparse(k=5)
-    pca = PCA(n_components=100)  # Adjust the number of components as needed
-    X_train_pca = pca.fit_transform(X_train_sparse.toarray())
-    accuracy_dict = knn_classifier.cross_validation(X_train_pca, y_train, k_val, n_splits=20, metric='f1')
+
+    accuracy_dict = knn_classifier.cross_validation(X_train_sparse, y_train, k_val, n_splits=10)
     for n, accuracy in accuracy_dict.items():
         print(f"Mean accuracy for k={n}: {accuracy}")
 
